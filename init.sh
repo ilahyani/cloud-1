@@ -29,25 +29,3 @@ aws configure set region "$AWS_REGION"
 cd /cloud/infrastructure
 terraform init
 terraform apply --auto-approve -var="aws_access_key=$AWS_ACCESS_KEY_ID" -var="aws_secret_key=$AWS_SECRET_ACCESS_KEY" -var="instance_count=$INSTANCE_COUNT"
-
-INSTANCE_IPS=$(terraform output -json public_ip)
-INSTANCE_IPS_ARRAY=($(echo $INSTANCE_IPS | jq -r '.[]'))
-
-cd /cloud
-
-for i in "${!INSTANCE_IPS_ARRAY[@]}"
-do
-    echo "${INSTANCE_IPS_ARRAY[$i]}"
-    scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i infrastructure/aws_ec2_key.pem inception/.env ubuntu@"${INSTANCE_IPS_ARRAY[$i]}":.env
-    ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i infrastructure/aws_ec2_key.pem ubuntu@"${INSTANCE_IPS_ARRAY[$i]}" << EOF
-        sed -i "s/localhost/${INSTANCE_IPS_ARRAY[$i]}/g" inception/.env
-        sudo apt update && sudo apt install -y make
-        sudo snap install docker
-        sudo make -C inception
-EOF
-done
-
-for i in "${!INSTANCE_IPS_ARRAY[@]}"
-do
-    echo "DEPLOYED TO ~> https://${INSTANCE_IPS_ARRAY[$i]}"
-done

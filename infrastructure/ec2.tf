@@ -4,18 +4,6 @@ resource "aws_instance" "inception" {
   vpc_security_group_ids = [aws_security_group.allow_connection.id]
   key_name               = aws_key_pair.inception_key.key_name
   count                  = var.instance_count
-
-  provisioner "file" {
-    source      = "../inception"
-    destination = "/home/ubuntu/inception"
-
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      host        = self.public_ip
-      private_key = file(local_file.private_key_pem.filename)
-    }
-  }
   
   tags = {
     Name = "inception"
@@ -71,6 +59,14 @@ resource "null_resource" "set_permissions" {
   }
 
   depends_on = [local_file.private_key_pem]
+}
+
+resource "local_file" "ansible_hosts_inventory" {
+  filename = "${path.module}/ansible/inventory"
+  content = <<EOT
+[inception]
+${join("\n", [for instance in aws_instance.inception : "${instance.public_ip} ansible_ssh_user=ubuntu ansible_ssh_private_key_file=${path.module}/aws_ec2_key.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no'"])}
+EOT
 }
 
 output "public_ip" {
